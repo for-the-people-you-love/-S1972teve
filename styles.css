@@ -145,3 +145,68 @@ button, input, textarea { font: inherit; }
   .stat-grid { grid-template-columns: 1fr; }
   .button-row { flex-wrap: wrap; }
 }
+/* ===== PAGE CURL EFFECT ===== */
+
+.page-corner-btn {
+  position: absolute;
+  bottom: 0;
+  width: 90px;
+  height: 90px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The folded paper look */
+.page-corner-btn::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #ffffff 0%, #f3e7d3 60%, #d6c4a3 100%);
+  border-top-left-radius: 14px;
+  box-shadow:
+    -4px -4px 10px rgba(0,0,0,0.08) inset,
+    2px 2px 8px rgba(0,0,0,0.15);
+  transition: all 0.25s ease;
+}
+
+/* Hover = lifting page */
+.page-corner-btn:hover::before {
+  transform: rotate(-8deg) scale(1.05);
+}
+
+/* Arrow */
+.page-corner-btn span {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
+  font-size: 22px;
+  color: #444;
+  z-index: 2;
+}
+
+/* Left side version */
+.page-corner-btn.left-corner {
+  left: 0;
+}
+
+.page-corner-btn.left-corner::before {
+  left: 0;
+  right: auto;
+  border-top-left-radius: 0;
+  border-top-right-radius: 14px;
+}
+
+.page-corner-btn.left-corner span {
+  left: 12px;
+  right: auto;
+}
+
+/* Disabled */
+.page-corner-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
