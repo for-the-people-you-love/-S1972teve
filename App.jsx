@@ -536,3 +536,10 @@ export default function App() {
 >
   <span>↩</span>
 </button>
+<button
+  type="button"
+  className={`page-corner-btn right-corner ${canGoForward ? "" : "disabled"}`}
+  onClick={() => canGoForward && setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
+>
+  <span>↪</span>
+</button>
