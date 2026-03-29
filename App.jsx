@@ -529,3 +529,10 @@ export default function App() {
     </div>
   );
 }
+<button
+  type="button"
+  className={`page-corner-btn left-corner ${canGoBack ? "" : "disabled"}`}
+  onClick={() => canGoBack && setPageIndex((p) => Math.max(0, p - 1))}
+>
+  <span>↩</span>
+</button>
