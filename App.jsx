@@ -1,545 +1,428 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Heart, Lock, Mic, Plus, Save, ShieldCheck, Upload, UserPlus, Users } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { BookOpen, Library, LockKeyhole, ShieldCheck } from "lucide-react";
 
-const STORAGE_KEY = "for-the-people-you-love-app";
+const TOTAL_PAGES = 13;
+const INDEX_PAGES = [
+  "Page 1 — About you: name, birthday, birthplace, parents, brothers and sisters.",
+  "Page 2 — Father: one main picture in the center with a collage around him.",
+  "Page 3 — Mother: one main picture in the center with a collage around her.",
+  "Page 4 — Brothers and sisters: add unlimited pages for each family member.",
+  "Page 5 — You: one main picture in the center with a collage around you.",
+  "Page 6 — Jobs: what they were like, what you were paid when you started and when you finished, plus job photos.",
+  "Page 7 — Family stories and pictures with the option to add more pages.",
+  "Page 8 — Friends stories and pictures with the option to add more pages.",
+  "Page 9 — Diary with unlimited writing pages.",
+  "Page 10 — Contacts, notifications, who gets the book, and who is an Angel.",
+  "Page 11 — Important information your Angel needs to know.",
+  "Page 12 — Angel message page for family, friends, and professionals."
+];
 
-function formatList(text) {
-  return text
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const initialState = {
+  subtitle: "",
+  authorLine: "",
+  password: "",
+  fullName: "",
+  birthday: "",
+  birthplace: "",
+  fatherName: "",
+  motherName: "",
+  siblings: "",
+  fatherStory: "",
+  motherStory: "",
+  familyMemberName: "",
+  familyMemberRelationship: "",
+  familyMemberStory: "",
+  yourStory: "",
+  jobTitle: "",
+  jobYears: "",
+  jobStartPay: "",
+  jobEndPay: "",
+  jobStory: "",
+  familyStoryTitle: "",
+  familyStoryText: "",
+  friendStoryTitle: "",
+  friendStoryText: "",
+  diaryEntryTitle: "",
+  diaryEntryText: "",
+  contactName: "",
+  contactEmail: "",
+  contactPhone: "",
+  isRecipient: false,
+  isAngel: false,
+};
 
-function getInitialData() {
-  return {
-    step: 0,
-    user: {
-      email: "",
-      password: "",
-      fullName: "Steve McMASTER",
-      birthday: "",
-      birthplace: "",
-      highSchool: "",
-      currentLocation: "",
-      coverPhoto: "",
-      bio: "The best times in life were often the simple ones with family, laughter, and being together.",
-    },
-    angel: {
-      name: "",
-      email: "",
-      relationship: "",
-      doctor: "",
-      lifeInsurance: "",
-      vehicleInsurance: "",
-      finalWishes: "",
-      memberships: "",
-      privateNotes: "",
-      writtenMessage: "If you are hearing this, thank you for being my Angel. Please start with my most important wishes and contacts.",
-      audioURL: "",
-    },
-    familyContacts: "",
-    memories: [
-      {
-        id: 1,
-        title: "My first memory",
-        yearLabel: "Childhood",
-        story: "This was one of my favorite early memories. I would want my family to remember how happy this day felt.",
-        image: "",
-        audioURL: "",
-      },
-    ],
-  };
-}
-
-function usePersistentState() {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return getInitialData();
-    try {
-      return { ...getInitialData(), ...JSON.parse(saved) };
-    } catch {
-      return getInitialData();
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
-
-  return [data, setData];
-}
-
-function Badge({ children }) {
-  return <div className="badge">{children}</div>;
-}
-
-function Card({ children, className = "" }) {
-  return <div className={`card ${className}`}>{children}</div>;
-}
-
-function Input(props) {
+function Field(props) {
   return <input {...props} className={`field ${props.className || ""}`} />;
 }
-
-function Textarea(props) {
+function Area(props) {
   return <textarea {...props} className={`field textarea ${props.className || ""}`} />;
 }
 
-function Button({ children, variant = "primary", className = "", ...props }) {
+function CoverBook({ subtitle, authorLine, onOpen, staticMode = false }) {
   return (
-    <button {...props} className={`btn ${variant === "secondary" ? "btn-secondary" : "btn-primary"} ${className}`}>
-      {children}
-    </button>
-  );
-}
-
-function AudioRecorder({ value, onChange }) {
-  const [isRecording, setIsRecording] = useState(false);
-  const recorderRef = useRef(null);
-  const chunksRef = useRef([]);
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
-        onChange(url);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setIsRecording(true);
-    } catch {
-      alert("Microphone permission is needed to record voice.");
-    }
-  };
-
-  const stopRecording = () => {
-    recorderRef.current?.stop();
-    setIsRecording(false);
-  };
-
-  return (
-    <div className="audio-row">
-      {!isRecording ? (
-        <Button type="button" onClick={startRecording}><Mic size={16} /> Record</Button>
-      ) : (
-        <Button type="button" variant="secondary" onClick={stopRecording}>Stop</Button>
-      )}
-      {value ? <audio controls src={value} className="audio-player" /> : <span className="muted">No voice recording yet</span>}
-    </div>
-  );
-}
-
-function ImageUpload({ onLoad, label = "Upload photo" }) {
-  const handleChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onLoad(String(reader.result));
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <label className="upload-box">
-      <Upload size={16} />
-      {label}
-      <input type="file" accept="image/*" hidden onChange={handleChange} />
-    </label>
-  );
-}
-
-function SignupStep({ data, setData }) {
-  return (
-    <div className="split-layout">
-      <div>
-        <Badge><Heart size={14} /> Welcome</Badge>
-        <h1 className="hero-title">Start your life album.</h1>
-        <p className="hero-copy">Build a living photo album with memories, stories, and voice recordings that your family can keep forever.</p>
+    <motion.button
+      type="button"
+      initial={{ rotateX: 16, rotateY: -18, scale: 0.95 }}
+      animate={{ rotateX: 16, rotateY: -18, scale: 1 }}
+      whileHover={staticMode ? {} : { y: -8, scale: 1.02 }}
+      transition={{ duration: 0.45 }}
+      onClick={onOpen}
+      className={`book-cover ${staticMode ? "static-book" : ""}`}
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      <div className="book-spine-cover" />
+      <div className="gold-frame" />
+      <div className="top-band" />
+      <div className="bottom-band" />
+      <div className="book-cover-inner">
+        <div className="cover-seal" />
+        <h1 className="cover-title">For You When I'm Gone</h1>
+        <p className="cover-subtitle">
+          {subtitle || "Everything I wanted you to remember, know, and take care of."}
+        </p>
+        <p className="cover-author">{authorLine || "written by..."}</p>
       </div>
-      <Card>
-        <h2>Create your account</h2>
-        <div className="stack">
-          <Input placeholder="Email" value={data.user.email} onChange={(e) => setData((d) => ({ ...d, user: { ...d.user, email: e.target.value } }))} />
-          <Input type="password" placeholder="Password" value={data.user.password} onChange={(e) => setData((d) => ({ ...d, user: { ...d.user, password: e.target.value } }))} />
-          <Button onClick={() => setData((d) => ({ ...d, step: 1 }))}>Create Album</Button>
-        </div>
-      </Card>
-    </div>
+      {!staticMode ? <div className="tap-note">Tap to open</div> : null}
+    </motion.button>
   );
 }
 
-function CoverStep({ data, setData }) {
+function SecurePrompt({ secureInput, setSecureInput, unlockProtected, useFingerprint }) {
   return (
-    <div className="split-layout">
-      <Card>
-        <h2>Your album cover</h2>
-        <div className="stack">
-          <Input placeholder="Your name" value={data.user.fullName} onChange={(e) => setData((d) => ({ ...d, user: { ...d.user, fullName: e.target.value } }))} />
-          <ImageUpload label="Upload cover photo" onLoad={(image) => setData((d) => ({ ...d, user: { ...d.user, coverPhoto: image } }))} />
-          <div className="button-row">
-            <Button variant="secondary" onClick={() => setData((d) => ({ ...d, step: 0 }))}>Back</Button>
-            <Button onClick={() => setData((d) => ({ ...d, step: 2 }))}>Next</Button>
-          </div>
-        </div>
-      </Card>
-      <div className="cover-preview">
-        {data.user.coverPhoto ? <img src={data.user.coverPhoto} alt="Cover" className="cover-image" /> : null}
-        <div className="cover-overlay">
-          <p className="cover-kicker">For the people you love</p>
-          <h2>{data.user.fullName || "Your Name"}</h2>
-          <p>A life album filled with memories, photos, stories, and voice.</p>
-        </div>
+    <div className="secure-box">
+      <p className="eyebrow secure-title">
+        <LockKeyhole size={14} /> Secure access required
+      </p>
+      <p className="muted">
+        Pages 10, 11, and 12 are protected. Use your password or fingerprint to continue.
+      </p>
+      <Field type="password" value={secureInput} onChange={(e) => setSecureInput(e.target.value)} placeholder="Enter password" />
+      <div className="secure-actions">
+        <button onClick={unlockProtected} className="primary-btn">Unlock with password</button>
+        <button onClick={useFingerprint} className="secondary-btn">Use fingerprint</button>
       </div>
     </div>
   );
 }
 
-function InfoStep({ data, setData }) {
-  const update = (field, value) => setData((d) => ({ ...d, user: { ...d.user, [field]: value } }));
+function PhotoStoryPage({ title, intro, subjectLabel, storyLabel, storyValue, onStoryChange }) {
   return (
-    <Card>
-      <h2>Tell your story</h2>
-      <div className="grid-two">
-        <Input placeholder="Birthday (optional)" value={data.user.birthday} onChange={(e) => update("birthday", e.target.value)} />
-        <Input placeholder="Birthplace (optional)" value={data.user.birthplace} onChange={(e) => update("birthplace", e.target.value)} />
-        <Input placeholder="High school (optional)" value={data.user.highSchool} onChange={(e) => update("highSchool", e.target.value)} />
-        <Input placeholder="Where you live today (optional)" value={data.user.currentLocation} onChange={(e) => update("currentLocation", e.target.value)} />
-        <div className="full-span">
-          <Textarea rows={6} placeholder="Write a short introduction to your album" value={data.user.bio} onChange={(e) => update("bio", e.target.value)} />
+    <>
+      <h2 className="page-title">{title}</h2>
+      <p className="page-copy">{intro}</p>
+      <div className="card-block">
+        <div className="photo-layout">
+          <div className="collage-col">
+            <div className="photo-box">Collage photo</div>
+            <div className="photo-box">Collage photo</div>
+            <div className="photo-box">Collage photo</div>
+          </div>
+          <div className="main-photo-wrap">
+            <div className="main-photo-box">Main center photo of {subjectLabel}</div>
+          </div>
+          <div className="collage-col">
+            <div className="photo-box">Collage photo</div>
+            <div className="photo-box">Collage photo</div>
+            <div className="photo-box">Collage photo</div>
+          </div>
         </div>
       </div>
-      <div className="button-row top-gap">
-        <Button variant="secondary" onClick={() => setData((d) => ({ ...d, step: 1 }))}>Back</Button>
-        <Button onClick={() => setData((d) => ({ ...d, step: 3 }))}>Next</Button>
+      <div className="card-block">
+        <p className="mini-heading">{storyLabel}</p>
+        <Area rows={8} value={storyValue} onChange={onStoryChange} placeholder={`Write about ${subjectLabel}, the memories you have, what made ${subjectLabel} special, and anything you want remembered.`} />
       </div>
-    </Card>
+    </>
   );
 }
 
-function MemoryStep({ data, setData }) {
-  const memory = data.memories[0];
-  const updateMemory = (changes) => setData((d) => ({ ...d, memories: d.memories.map((m, i) => i === 0 ? { ...m, ...changes } : m) }));
-
+function AboutPage({ state, setState }) {
   return (
-    <div className="split-layout">
-      <Card>
-        <h2>Add your first memory</h2>
-        <div className="stack">
-          <Input placeholder="Memory title" value={memory.title} onChange={(e) => updateMemory({ title: e.target.value })} />
-          <Input placeholder="Year or life stage" value={memory.yearLabel} onChange={(e) => updateMemory({ yearLabel: e.target.value })} />
-          <ImageUpload onLoad={(image) => updateMemory({ image })} />
-          <Textarea rows={6} placeholder="Tell the story behind this photo" value={memory.story} onChange={(e) => updateMemory({ story: e.target.value })} />
-          <AudioRecorder value={memory.audioURL} onChange={(audioURL) => updateMemory({ audioURL })} />
+    <>
+      <h2 className="page-title">Page 1 — About You</h2>
+      <p className="page-copy">This page lets you enter the important information about yourself and your family roots.</p>
+      <div className="card-block">
+        <div className="grid-two">
+          <Field placeholder="Full name" value={state.fullName} onChange={(e) => setState((s) => ({ ...s, fullName: e.target.value }))} />
+          <Field placeholder="Birthday" value={state.birthday} onChange={(e) => setState((s) => ({ ...s, birthday: e.target.value }))} />
+          <Field placeholder="Where you were born" value={state.birthplace} onChange={(e) => setState((s) => ({ ...s, birthplace: e.target.value }))} />
+          <Field placeholder="Father's name" value={state.fatherName} onChange={(e) => setState((s) => ({ ...s, fatherName: e.target.value }))} />
+          <Field placeholder="Mother's name" value={state.motherName} onChange={(e) => setState((s) => ({ ...s, motherName: e.target.value }))} />
+          <Area rows={5} placeholder="Brothers and sisters" value={state.siblings} onChange={(e) => setState((s) => ({ ...s, siblings: e.target.value }))} className="span-2" />
         </div>
-        <div className="button-row top-gap">
-          <Button variant="secondary" onClick={() => setData((d) => ({ ...d, step: 2 }))}>Back</Button>
-          <Button onClick={() => setData((d) => ({ ...d, step: 4 }))}>Next</Button>
-        </div>
-      </Card>
-
-      <Card>
-        <h2>Preview</h2>
-        <div className="memory-preview">
-          {memory.image ? <img src={memory.image} alt={memory.title} className="memory-image" /> : <div className="image-placeholder">Your photo will appear here</div>}
-          <p className="memory-label">{memory.yearLabel}</p>
-          <h3>{memory.title}</h3>
-          <p className="muted-copy">{memory.story}</p>
-        </div>
-      </Card>
-    </div>
+      </div>
+    </>
   );
 }
 
-function AngelStep({ data, setData }) {
-  const updateAngel = (field, value) => setData((d) => ({ ...d, angel: { ...d.angel, [field]: value } }));
+function FamilyMemberPage({ state, setState }) {
   return (
-    <div className="split-layout">
-      <Card>
-        <h2>Choose your Angel</h2>
-        <div className="stack">
-          <Input placeholder="Angel name" value={data.angel.name} onChange={(e) => updateAngel("name", e.target.value)} />
-          <Input placeholder="Angel email" value={data.angel.email} onChange={(e) => updateAngel("email", e.target.value)} />
-          <Input placeholder="Relationship" value={data.angel.relationship} onChange={(e) => updateAngel("relationship", e.target.value)} />
-          <Textarea rows={5} placeholder="Leave a written message for your Angel" value={data.angel.writtenMessage} onChange={(e) => updateAngel("writtenMessage", e.target.value)} />
-          <AudioRecorder value={data.angel.audioURL} onChange={(audioURL) => updateAngel("audioURL", audioURL)} />
+    <>
+      <h2 className="page-title">Page 4 — Brothers and Sisters</h2>
+      <p className="page-copy">This page lets you start a family member page for each brother or sister. You can keep adding as many pages as needed so everyone in the family has their place in the book.</p>
+      <div className="card-block">
+        <div className="grid-two">
+          <Field placeholder="Brother or sister name" value={state.familyMemberName} onChange={(e) => setState((s) => ({ ...s, familyMemberName: e.target.value }))} />
+          <Field placeholder="Relationship (brother / sister)" value={state.familyMemberRelationship} onChange={(e) => setState((s) => ({ ...s, familyMemberRelationship: e.target.value }))} />
         </div>
-        <div className="button-row top-gap">
-          <Button variant="secondary" onClick={() => setData((d) => ({ ...d, step: 3 }))}>Back</Button>
-          <Button onClick={() => setData((d) => ({ ...d, step: 5 }))}>Finish Setup</Button>
-        </div>
-      </Card>
-
-      <Card>
-        <h2>What your Angel can do</h2>
-        <div className="stack small-gap">
-          <div className="notice-box">View your private notes and final wishes.</div>
-          <div className="notice-box">Hear your voice message and replay it anytime.</div>
-          <div className="notice-box">Handle notifications and important next steps when needed.</div>
-        </div>
-      </Card>
-    </div>
+        <div className="single-main-photo"><div className="main-photo-box short">Main center photo for this family member</div></div>
+        <div className="three-up"><div className="photo-box">Collage photo</div><div className="photo-box">Collage photo</div><div className="photo-box">Collage photo</div></div>
+      </div>
+      <div className="card-block">
+        <p className="mini-heading">About this family member</p>
+        <Area rows={8} value={state.familyMemberStory} onChange={(e) => setState((s) => ({ ...s, familyMemberStory: e.target.value }))} placeholder="Write about your brother or sister, your memories together, what made them special, and anything you want future generations to know." />
+        <div className="action-row"><button className="primary-btn">Save this family page</button><button className="secondary-btn">Add another family page</button></div>
+      </div>
+    </>
   );
 }
 
-function AlbumSpine({ count }) {
-  const thickness = Math.max(24, Math.min(140, count * 16));
+function JobsPage({ state, setState }) {
   return (
-    <div className="spine-wrap">
-      <div className="spine" style={{ width: thickness }} />
-      <div className="spine-cover">
-        <p className="cover-kicker">Legacy Album</p>
-        <h3>{count} page{count === 1 ? "" : "s"}</h3>
-        <p>Your album grows thicker every time memories are added.</p>
+    <>
+      <h2 className="page-title">Page 6 — Jobs</h2>
+      <p className="page-copy">Add the jobs you’ve had, what they were like, what you were paid when you started and finished, and the years you worked. Include photos from your work as well.</p>
+      <div className="card-block">
+        <div className="grid-two">
+          <Field placeholder="Job title" value={state.jobTitle} onChange={(e) => setState((s) => ({ ...s, jobTitle: e.target.value }))} />
+          <Field placeholder="Years worked (e.g. 2005–2015)" value={state.jobYears} onChange={(e) => setState((s) => ({ ...s, jobYears: e.target.value }))} />
+          <Field placeholder="Starting pay" value={state.jobStartPay} onChange={(e) => setState((s) => ({ ...s, jobStartPay: e.target.value }))} />
+          <Field placeholder="Ending pay" value={state.jobEndPay} onChange={(e) => setState((s) => ({ ...s, jobEndPay: e.target.value }))} />
+        </div>
+        <div className="single-main-photo"><div className="main-photo-box short">Main photo from this job</div></div>
+        <div className="three-up"><div className="photo-box">Work photo</div><div className="photo-box">Work photo</div><div className="photo-box">Work photo</div></div>
       </div>
-    </div>
+      <div className="card-block">
+        <p className="mini-heading">About this job</p>
+        <Area rows={8} value={state.jobStory} onChange={(e) => setState((s) => ({ ...s, jobStory: e.target.value }))} placeholder="Write what this job was like, what you learned, the people you worked with, and how it impacted your life." />
+        <div className="action-row"><button className="primary-btn">Save this job</button><button className="secondary-btn">Add another job</button></div>
+      </div>
+    </>
   );
 }
 
-function OpenAlbum({ data, setData }) {
-  const [pageIndex, setPageIndex] = useState(0);
-  const [newMemory, setNewMemory] = useState({ id: 0, title: "", yearLabel: "", story: "", image: "", audioURL: "" });
-  const totalPages = data.memories.length + 1;
-  const currentMemory = data.memories[pageIndex - 1];
-  const familyList = useMemo(() => formatList(data.familyContacts), [data.familyContacts]);
-
-  const saveNewMemory = () => {
-    if (!newMemory.title && !newMemory.story) return;
-    const memory = { ...newMemory, id: Date.now() };
-    setData((d) => ({ ...d, memories: [...d.memories, memory] }));
-    setNewMemory({ id: 0, title: "", yearLabel: "", story: "", image: "", audioURL: "" });
-    setPageIndex(totalPages);
-  };
-
+function StoryCollectionPage({ title, intro, itemLabel, titleValue, textValue, onTitleChange, onTextChange }) {
   return (
-    <div className="dashboard-stack">
-      <div className="dashboard-grid">
-        <Card>
-          <h2 className="icon-title"><BookOpen size={18} /> Your album dashboard</h2>
-          <AlbumSpine count={totalPages} />
-          <div className="stat-grid">
-            <div className="stat-box"><strong>{data.memories.length}</strong><span>Memories</span></div>
-            <div className="stat-box"><strong>{familyList.length}</strong><span>Family & Friends</span></div>
-            <div className="stat-box"><strong>{data.angel.name ? 1 : 0}</strong><span>Angel</span></div>
-          </div>
-        </Card>
-
-        <Card>
-          <h2>Open album</h2>
-          <div className="book-shell">
-            <div className="book-center" />
-            <div className="book-grid">
-              <div className="book-page left-page">
-                <p className="page-kicker">{pageIndex === 0 ? "Cover page" : `Page ${pageIndex}`}</p>
-                {pageIndex === 0 ? (
-                  <>
-                    <h2>{data.user.fullName || "Your Album"}</h2>
-                    <p className="muted-copy top-gap">{data.user.bio}</p>
-                    <div className="top-gap stack small-gap">
-                      {data.user.birthday ? <p><strong>Birthday:</strong> {data.user.birthday}</p> : null}
-                      {data.user.birthplace ? <p><strong>Born in:</strong> {data.user.birthplace}</p> : null}
-                      {data.user.highSchool ? <p><strong>High school:</strong> {data.user.highSchool}</p> : null}
-                      {data.user.currentLocation ? <p><strong>Lives in:</strong> {data.user.currentLocation}</p> : null}
-                    </div>
-                  </>
-                ) : (
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentMemory?.id}
-                      initial={{ rotateY: 90, opacity: 0 }}
-                      animate={{ rotateY: 0, opacity: 1 }}
-                      exit={{ rotateY: -90, opacity: 0 }}
-                      transition={{ duration: 0.5 }}
-                      style={{ transformOrigin: "left center" }}
-                    >
-                      <p className="memory-label">{currentMemory?.yearLabel}</p>
-                      <h2>{currentMemory?.title}</h2>
-                      <p className="muted-copy top-gap">{currentMemory?.story}</p>
-                      <div className="top-gap">
-                        <AudioRecorder
-                          value={currentMemory?.audioURL}
-                          onChange={(audioURL) =>
-                            setData((d) => ({
-                              ...d,
-                              memories: d.memories.map((m) => m.id === currentMemory.id ? { ...m, audioURL } : m),
-                            }))
-                          }
-                        />
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                )}
-              </div>
-              <div className="book-page right-page">
-                {pageIndex === 0 ? (
-                  <div className="image-placeholder large">Open your album and start turning pages.</div>
-                ) : currentMemory?.image ? (
-                  <AnimatePresence mode="wait">
-                    <motion.img
-                      key={`${currentMemory.id}-img`}
-                      src={currentMemory.image}
-                      alt={currentMemory.title}
-                      className="memory-image full-height"
-                      initial={{ rotateY: 90, opacity: 0 }}
-                      animate={{ rotateY: 0, opacity: 1 }}
-                      exit={{ rotateY: -90, opacity: 0 }}
-                      transition={{ duration: 0.5 }}
-                      style={{ transformOrigin: "left center" }}
-                    />
-                  </AnimatePresence>
-                ) : (
-                  <div className="image-placeholder large">This memory has no photo yet.</div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="button-row top-gap">
-            <Button variant="secondary" onClick={() => setPageIndex((p) => Math.max(0, p - 1))}>Previous</Button>
-            <span className="muted">Page {pageIndex + 1} of {totalPages}</span>
-            <Button onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}>Next</Button>
-          </div>
-        </Card>
+    <>
+      <h2 className="page-title">{title}</h2>
+      <p className="page-copy">{intro}</p>
+      <div className="card-block">
+        <Field placeholder="Title of this memory" value={titleValue} onChange={onTitleChange} />
+        <div className="single-main-photo"><div className="main-photo-box short">Main photo for this memory</div></div>
+        <div className="three-up"><div className="photo-box">{itemLabel}</div><div className="photo-box">{itemLabel}</div><div className="photo-box">{itemLabel}</div></div>
       </div>
-
-      <div className="dashboard-grid">
-        <Card>
-          <h2 className="icon-title"><Plus size={18} /> Add a new memory</h2>
-          <div className="stack">
-            <Input placeholder="Memory title" value={newMemory.title} onChange={(e) => setNewMemory((m) => ({ ...m, title: e.target.value }))} />
-            <Input placeholder="Year or life stage" value={newMemory.yearLabel} onChange={(e) => setNewMemory((m) => ({ ...m, yearLabel: e.target.value }))} />
-            <ImageUpload label="Upload memory photo" onLoad={(image) => setNewMemory((m) => ({ ...m, image }))} />
-            <Textarea rows={5} placeholder="Tell the story behind this photo" value={newMemory.story} onChange={(e) => setNewMemory((m) => ({ ...m, story: e.target.value }))} />
-            <AudioRecorder value={newMemory.audioURL} onChange={(audioURL) => setNewMemory((m) => ({ ...m, audioURL }))} />
-            <Button onClick={saveNewMemory}>Save Memory</Button>
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="icon-title"><Users size={18} /> Family and friends</h2>
-          <Textarea rows={5} placeholder="Add names or emails separated by commas" value={data.familyContacts} onChange={(e) => setData((d) => ({ ...d, familyContacts: e.target.value }))} />
-          <div className="pill-wrap top-gap">
-            {familyList.length ? familyList.map((item) => <span key={item} className="pill">{item}</span>) : <p className="muted">No family or friends added yet.</p>}
-          </div>
-        </Card>
+      <div className="card-block">
+        <p className="mini-heading">The story behind this moment</p>
+        <Area rows={8} value={textValue} onChange={onTextChange} placeholder="Tell the story behind this moment. Who was there? What happened? Why is it important?" />
+        <div className="action-row"><button className="primary-btn">Save this memory</button><button className="secondary-btn">Add another memory page</button></div>
       </div>
-
-      <div className="dashboard-grid">
-        <Card>
-          <h2 className="icon-title"><ShieldCheck size={18} /> Angel section</h2>
-          <div className="notice-box"><strong>{data.angel.name || "No Angel chosen yet"}</strong><br />{data.angel.relationship || "Relationship not added"}<br />{data.angel.email || "Email not added"}</div>
-          <div className="stack top-gap">
-            <Input placeholder="Doctor" value={data.angel.doctor} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, doctor: e.target.value } }))} />
-            <Input placeholder="Life insurance" value={data.angel.lifeInsurance} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, lifeInsurance: e.target.value } }))} />
-            <Input placeholder="Vehicle insurance" value={data.angel.vehicleInsurance} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, vehicleInsurance: e.target.value } }))} />
-            <Textarea rows={4} placeholder="Burial or cremation wishes" value={data.angel.finalWishes} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, finalWishes: e.target.value } }))} />
-            <Textarea rows={4} placeholder="Memberships or recurring payments" value={data.angel.memberships} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, memberships: e.target.value } }))} />
-            <Textarea rows={4} placeholder="Private notes for your Angel" value={data.angel.privateNotes} onChange={(e) => setData((d) => ({ ...d, angel: { ...d.angel, privateNotes: e.target.value } }))} />
-            <AudioRecorder value={data.angel.audioURL} onChange={(audioURL) => setData((d) => ({ ...d, angel: { ...d.angel, audioURL } }))} />
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="icon-title"><Lock size={18} /> Back of the album checklist</h2>
-          <div className="stack small-gap">
-            {[
-              "Notify family and close friends",
-              "Contact the doctor, funeral home, or care provider",
-              "Locate insurance information and important documents",
-              "Carry out burial or cremation wishes",
-              "Notify banks, memberships, and other services",
-              "Send one message to family and friends and one to professional contacts",
-            ].map((item, index) => (
-              <div key={item} className="notice-box"><strong>Step {index + 1}</strong><br />{item}</div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </div>
+    </>
   );
+}
+
+function DiaryPage({ state, setState }) {
+  return (
+    <>
+      <h2 className="page-title">Page 9 — Diary</h2>
+      <p className="page-copy">This is your personal diary. You can write anything here — your thoughts, feelings, memories, or moments in time. There are no rules.</p>
+      <div className="card-block">
+        <Field placeholder="Title or date (optional)" value={state.diaryEntryTitle} onChange={(e) => setState((s) => ({ ...s, diaryEntryTitle: e.target.value }))} />
+        <Area rows={14} value={state.diaryEntryText} onChange={(e) => setState((s) => ({ ...s, diaryEntryText: e.target.value }))} placeholder="Write whatever you want here... your thoughts, your day, your memories, or anything you want to leave behind." className="top-gap" />
+      </div>
+      <div className="card-block"><div className="action-row"><button className="primary-btn">Save this entry</button><button className="secondary-btn">Add another diary page</button></div></div>
+    </>
+  );
+}
+
+function ContactsPage({ state, setState }) {
+  return (
+    <>
+      <h2 className="page-title">Page 10 — Contacts & Angel</h2>
+      <p className="page-copy">Add the people in your life who should be notified. Choose who receives your book and who will be your Angel.</p>
+      <div className="card-block">
+        <div className="grid-two">
+          <Field placeholder="Full name" value={state.contactName} onChange={(e) => setState((s) => ({ ...s, contactName: e.target.value }))} />
+          <Field placeholder="Email address" value={state.contactEmail} onChange={(e) => setState((s) => ({ ...s, contactEmail: e.target.value }))} />
+          <Field placeholder="Phone number" value={state.contactPhone} onChange={(e) => setState((s) => ({ ...s, contactPhone: e.target.value }))} />
+        </div>
+        <div className="check-row">
+          <label><input type="checkbox" checked={state.isRecipient} onChange={(e) => setState((s) => ({ ...s, isRecipient: e.target.checked }))} /> Send them this book</label>
+          <label><input type="checkbox" checked={state.isAngel} onChange={(e) => setState((s) => ({ ...s, isAngel: e.target.checked }))} /> Make this person an Angel</label>
+        </div>
+      </div>
+      <div className="card-block"><div className="action-row"><button className="primary-btn">Save contact</button><button className="secondary-btn">Add another contact</button></div></div>
+    </>
+  );
+}
+
+function AngelInfoPage() {
+  return (
+    <>
+      <h2 className="page-title">Page 11 — For Your Angel</h2>
+      <p className="page-copy">This section is for important information your Angel will need when you pass away. Keep it clear and up to date.</p>
+      <div className="card-block">
+        <div className="grid-two">
+          <Field placeholder="Life insurance company" />
+          <Field placeholder="Policy number" />
+          <Field placeholder="Vehicle insurance" />
+          <Field placeholder="Doctor / clinic" />
+          <Field placeholder="Lawyer / will location" className="span-2" />
+        </div>
+        <div className="radio-row">
+          <label><input type="radio" name="burial" /> Burial</label>
+          <label><input type="radio" name="burial" /> Cremation</label>
+        </div>
+        <p className="mini-heading">Memberships to cancel</p>
+        <Area rows={4} placeholder="List any memberships or subscriptions that need to be cancelled." />
+        <p className="mini-heading top-gap">Important instructions</p>
+        <Area rows={6} placeholder="Remind your Angel to contact insurance companies and request their checklist of what needs to be done when someone passes away. Add anything else they should know." />
+      </div>
+      <div className="card-block"><button className="primary-btn">Save this information</button></div>
+    </>
+  );
+}
+
+function AngelMessagePage() {
+  return (
+    <>
+      <h2 className="page-title">Page 12 — Angel Message</h2>
+      <p className="page-copy">This page is for your Angel. After you pass, they can write a message about you and send it to your family and friends.</p>
+      <div className="card-block">
+        <Field placeholder="Your Angel's name" />
+        <p className="mini-heading top-gap">Message to family and friends</p>
+        <Area rows={10} placeholder="Write a message about their life, who they were, what they meant to people, and anything you want everyone to know." />
+        <p className="mini-heading top-gap">Message for professionals (optional)</p>
+        <Area rows={6} placeholder="Separate message for doctors, insurance companies, or other professionals if needed." />
+      </div>
+      <div className="card-block"><div className="action-row"><button className="primary-btn">Send message to family & friends</button><button className="secondary-btn">Send message to professionals</button></div></div>
+    </>
+  );
+}
+
+function renderPageContent(pageNumber, state, setState) {
+  switch (pageNumber) {
+    case 1: return <><h2 className="page-title">Index</h2><div className="index-list">{INDEX_PAGES.map((item) => <div key={item} className="index-item">{item}</div>)}</div></>;
+    case 2: return <AboutPage state={state} setState={setState} />;
+    case 3: return <PhotoStoryPage title="Page 2 — Father" intro="Add one main photo of your father in the center, a collage of pictures around him, and a story about who he was." subjectLabel="your father" storyLabel="About your father" storyValue={state.fatherStory} onStoryChange={(e) => setState((s) => ({ ...s, fatherStory: e.target.value }))} />;
+    case 4: return <PhotoStoryPage title="Page 3 — Mother" intro="Add one main photo of your mother in the center, a collage of pictures around her, and a story about who she was." subjectLabel="your mother" storyLabel="About your mother" storyValue={state.motherStory} onStoryChange={(e) => setState((s) => ({ ...s, motherStory: e.target.value }))} />;
+    case 5: return <FamilyMemberPage state={state} setState={setState} />;
+    case 6: return <PhotoStoryPage title="Page 5 — You" intro="This page is for you. Add one main photo in the center, a collage of pictures around you, and write your own story in your own words." subjectLabel="you" storyLabel="Your story" storyValue={state.yourStory} onStoryChange={(e) => setState((s) => ({ ...s, yourStory: e.target.value }))} />;
+    case 7: return <JobsPage state={state} setState={setState} />;
+    case 8: return <StoryCollectionPage title="Page 7 — Family Stories" intro="This is where you start adding moments with your family. Add photos and tell the story behind them. You can keep adding new pages for more memories." itemLabel="Memory photo" titleValue={state.familyStoryTitle} textValue={state.familyStoryText} onTitleChange={(e) => setState((s) => ({ ...s, familyStoryTitle: e.target.value }))} onTextChange={(e) => setState((s) => ({ ...s, familyStoryText: e.target.value }))} />;
+    case 9: return <StoryCollectionPage title="Page 8 — Friends" intro="This is where you add memories with your friends. These are the moments, laughs, and stories that shaped your life." itemLabel="Friend photo" titleValue={state.friendStoryTitle} textValue={state.friendStoryText} onTitleChange={(e) => setState((s) => ({ ...s, friendStoryTitle: e.target.value }))} onTextChange={(e) => setState((s) => ({ ...s, friendStoryText: e.target.value }))} />;
+    case 10: return <DiaryPage state={state} setState={setState} />;
+    case 11: return <ContactsPage state={state} setState={setState} />;
+    case 12: return <AngelInfoPage />;
+    case 13: return <AngelMessagePage />;
+    default: return <AngelMessagePage />;
+  }
 }
 
 export default function App() {
-  const [data, setData] = usePersistentState();
-  const steps = ["Sign up", "Cover", "Info", "First memory", "Choose Angel"];
+  const [stage, setStage] = useState("cover");
+  const [state, setState] = useState(initialState);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [secureInput, setSecureInput] = useState("");
+  const [showProtectedPrompt, setShowProtectedPrompt] = useState(false);
+  const [unlockedProtectedPages, setUnlockedProtectedPages] = useState(false);
+
+  const collageCards = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    id: i, rotate: [-9, -5, -2, 2, 5, 8][i % 6], top: 4 + (i % 4) * 22, left: 3 + (i % 3) * 31, width: 22 + (i % 2) * 3, height: 18 + (i % 3) * 2,
+  })), []);
+
+  const protectedPages = [11, 12, 13];
+  const canGoBack = pageNumber > 1;
+  const canGoForward = pageNumber < TOTAL_PAGES;
+
+  const tryGoToPage = (target) => {
+    if (protectedPages.includes(target) && !unlockedProtectedPages) {
+      setShowProtectedPrompt(true);
+      return;
+    }
+    setShowProtectedPrompt(false);
+    setPageNumber(target);
+  };
+
+  const unlockProtected = () => {
+    if (secureInput === state.password && state.password) {
+      setUnlockedProtectedPages(true);
+      setShowProtectedPrompt(false);
+      setPageNumber(11);
+    }
+  };
+
+  const useFingerprint = () => {
+    setUnlockedProtectedPages(true);
+    setShowProtectedPrompt(false);
+    setPageNumber(11);
+  };
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="app-kicker">For the people you love</p>
-          <p className="app-subtitle">A memory album, voice keepsake, and legacy guide</p>
-        </div>
-        <div className="button-row wrap-top">
-          <Button variant="secondary" onClick={() => setData(getInitialData())}>Reset Demo</Button>
-          <Button><Save size={16} /> Saved in browser</Button>
-        </div>
+      <div className="memory-collage" aria-hidden="true">
+        {collageCards.map((card) => <div key={card.id} className="memory-card" style={{ top: `${card.top}%`, left: `${card.left}%`, width: `${card.width}%`, height: `${card.height}%`, transform: `rotate(${card.rotate}deg)` }} />)}
+      </div>
+
+      <header className="top-bar">
+        <div><p className="eyebrow">For You When I'm Gone</p><h1>New clean package</h1></div>
+        <div className="header-pills"><span className="pill"><BookOpen size={14} /> My Book</span><span className="pill"><Library size={14} /> My Library</span></div>
       </header>
 
-      <main className="app-main">
-        {data.step < 5 ? (
-          <>
-            <div className="step-row">
-              {steps.map((step, index) => (
-                <div key={step} className={`step-pill ${data.step === index ? "active" : data.step > index ? "done" : ""}`}>
-                  {index + 1}. {step}
-                </div>
-              ))}
-            </div>
+      <main className="main-wrap">
+        <AnimatePresence mode="wait">
+          {stage === "cover" && (
+            <motion.section key="cover" className="center-stage" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }}>
+              <CoverBook subtitle={state.subtitle} authorLine={state.authorLine} onOpen={() => setStage("password")} />
+            </motion.section>
+          )}
 
-            {data.step === 0 && <SignupStep data={data} setData={setData} />}
-            {data.step === 1 && <CoverStep data={data} setData={setData} />}
-            {data.step === 2 && <InfoStep data={data} setData={setData} />}
-            {data.step === 3 && <MemoryStep data={data} setData={setData} />}
-            {data.step === 4 && <AngelStep data={data} setData={setData} />}
-          </>
-        ) : (
-          <>
-            <div className="dashboard-header">
-              <div>
-                <Badge><BookOpen size={14} /> Your live app</Badge>
-                <h1 className="hero-title small-top">{data.user.fullName || "Your Album"}</h1>
-                <p className="hero-copy">Your album is now working in the browser. You can keep adding memories, record voice notes, and build the Angel section.</p>
+          {stage === "password" && (
+            <motion.section key="password" className="password-layout" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}>
+              <div className="book-col"><CoverBook subtitle={state.subtitle} authorLine={state.authorLine} onOpen={() => {}} staticMode /></div>
+              <div className="password-card">
+                <p className="eyebrow">Protected book</p>
+                <h2>Create your password</h2>
+                <p className="muted">Before opening the book, create the password that protects your private pages. You can also set your cover subtitle and written-by line here.</p>
+                <div className="field-stack">
+                  <Field placeholder="Optional subtitle" value={state.subtitle} onChange={(e) => setState((s) => ({ ...s, subtitle: e.target.value }))} />
+                  <Field placeholder="Optional written by line" value={state.authorLine} onChange={(e) => setState((s) => ({ ...s, authorLine: e.target.value }))} />
+                  <Field type="password" placeholder="Create password" value={state.password} onChange={(e) => setState((s) => ({ ...s, password: e.target.value }))} />
+                </div>
+                <button className="primary-btn" onClick={() => state.password.trim() && setStage("reader")}>Open Book</button>
               </div>
-              <div className="button-row wrap-top">
-                <Button variant="secondary" onClick={() => setData((d) => ({ ...d, step: 0 }))}>Edit onboarding</Button>
-                <Button onClick={() => setData((d) => ({
-                  ...d,
-                  memories: [...d.memories, {
-                    id: Date.now(),
-                    title: "Another beautiful memory",
-                    yearLabel: "New page",
-                    story: "This is a new blank memory page ready for your next story.",
-                    image: "",
-                    audioURL: "",
-                  }],
-                }))}><UserPlus size={16} /> Add blank page</Button>
+            </motion.section>
+          )}
+
+          {stage === "reader" && (
+            <motion.section key="reader" initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <div className="reader-top">
+                <div className="reader-note"><ShieldCheck size={16} /><span>Pages 10, 11, and 12 require password or fingerprint.</span></div>
+                <div className="reader-note"><Library size={16} /><span>Library system placeholder included for future received books.</span></div>
               </div>
-            </div>
-            <OpenAlbum data={data} setData={setData} />
-          </>
-        )}
+              <div className="book-open">
+                <div className="book-spine-open" />
+                <div className="open-grid">
+                  <section className="left-page">
+                    <p className="page-kicker">Back of previous page</p>
+                    <div className="blank-back" />
+                    <button type="button" className={`corner-arrow left ${canGoBack ? "" : "disabled"}`} onClick={() => canGoBack && tryGoToPage(pageNumber - 1)} aria-label="Go back one page">←</button>
+                  </section>
+                  <section className="right-page">
+                    <AnimatePresence mode="wait">
+                      <motion.div key={pageNumber} initial={{ rotateY: 60, opacity: 0 }} animate={{ rotateY: 0, opacity: 1 }} exit={{ rotateY: -60, opacity: 0 }} transition={{ duration: 0.35 }} style={{ transformOrigin: "left center" }} className="page-content-wrap">
+                        <p className="page-kicker">Page {pageNumber}</p>
+                        {renderPageContent(pageNumber, state, setState)}
+                      </motion.div>
+                    </AnimatePresence>
+                    {showProtectedPrompt && <SecurePrompt secureInput={secureInput} setSecureInput={setSecureInput} unlockProtected={unlockProtected} useFingerprint={useFingerprint} />}
+                    <button type="button" className={`corner-arrow right ${canGoForward ? "" : "disabled"}`} onClick={() => canGoForward && tryGoToPage(pageNumber + 1)} aria-label="Go forward one page">→</button>
+                  </section>
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
 }
-<button
-  type="button"
-  className={`page-corner-btn left-corner ${canGoBack ? "" : "disabled"}`}
-  onClick={() => canGoBack && setPageIndex((p) => Math.max(0, p - 1))}
->
-  <span>↩</span>
-</button>
-<button
-  type="button"
-  className={`page-corner-btn right-corner ${canGoForward ? "" : "disabled"}`}
-  onClick={() => canGoForward && setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
->
-  <span>↪</span>
-</button>
